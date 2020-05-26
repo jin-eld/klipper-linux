@@ -1,0 +1,29 @@
+serial:
+  autoconnect: true
+  baudrate: 115200
+  port: /tmp/printer
+  timeout: {}
+plugins:
+  pluginmanager:
+    pip: /usr/bin/pip-sudo
+    pip_force_user: true
+  softwareupdate:
+    pip_command: /usr/bin/pip-sudo
+    _config_version: 6
+    checks:
+      octoprint:
+        checkout_folder: null
+        prerelease: false
+        prerelease_channel: null
+    notify_users: false
+server:
+  onlineCheck:
+    enabled: false
+  pluginBlacklist:
+    enabled: true
+  commands:
+    serverRestartCommand: /etc/init.d/octoprint restart
+    systemRestartCommand: shutdown -r now
+    systemShutdownCommand: shutdown -h now
+system:
+  actions: []

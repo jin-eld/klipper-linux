@@ -1,0 +1,118 @@
+# original recipe imported from
+# https://git.yoctoproject.org/cgit/cgit.cgi/meta-maker/tree/recipes-webui/octoprint/octoprint_git.bb
+
+SUMMARY = "OctoPrint provides a responsive web interface for controlling a 3D printer."
+HOMEPAGE = "http://octoprint.org"
+
+SECTION = "devel/python"
+
+LICENSE = "AGPL-3.0"
+LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=73f1eb20517c55bf9493b7dd6e480788"
+
+SRC_URI = "\
+    git://github.com/OctoPrint/OctoPrint.git;protocol=https;tag=${PV} \ 
+    file://config.yaml \
+    file://octoprint.default \
+    file://octoprint.init \
+    file://octoprint.sudo \
+    file://pip-sudo \
+    "
+
+S = "${WORKDIR}/git"
+
+inherit setuptools update-rc.d useradd
+
+
+export BUILD_SYS
+export HOST_SYS
+export STAGING_INCDIR
+export STAGING_LIBDIR
+
+BBCLASSEXTEND = "native"
+
+INITSCRIPT_NAME = "octoprint"
+INITSCRIPT_PARAMS = "start 90 2 3 4 5 . stop 80 2 3 4 5 ."
+
+do_install_append(){
+    install -d ${D}${sysconfdir}/octoprint
+    install -d ${D}${sysconfdir}/default
+    install -m 0644 ${WORKDIR}/octoprint.default ${D}${sysconfdir}/default/octoprint
+    install -m 0644 ${WORKDIR}/config.yaml ${D}${sysconfdir}/octoprint/config.yaml
+    chmod a+rw ${D}${sysconfdir}/octoprint/
+
+    install -d ${D}${sysconfdir}/init.d
+    install -m 0755 ${WORKDIR}/octoprint.init ${D}${sysconfdir}/init.d/octoprint
+
+    install -d ${D}${localstatedir}/lib/octoprint
+    chmod a+rw ${D}${localstatedir}/lib/octoprint
+
+    install -d ${D}${sysconfdir}/sudoers.d
+    install -m 0644 ${WORKDIR}/octoprint.sudo ${D}${sysconfdir}/sudoers.d/octoprint
+
+    install -d ${D}${bindir}
+    install -m 0755 ${WORKDIR}/pip-sudo ${D}${bindir}
+}
+
+
+FILES_${PN} += "${sysconfdir} ${localstatedir}"
+CONFFILES_${PN} += "${sysconfdir}/octoprint/config.yaml"
+
+USERADD_PACKAGES = "${PN}"
+GROUPADD_PARAM_${PN} = "octoprint"
+USERADD_PARAM_${PN} = "--system -d ${localstatedir}/lib/octoprint/ -g octoprint octoprint"
+
+pkg_postinst_ontarget_${PN}_append () {
+    chown -R octoprint.octoprint $D${sysconfdir}/octoprint
+    chown -R octoprint.octoprint $D${localstatedir}/lib/octoprint
+}
+
+DEPENDS = "${PYTHON_PN} ${PYTHON_PN}-markdown-native"
+
+INSANE_SKIP_${PN} += "build-deps"
+
+RDEPENDS_${PN} = "\
+    ${PYTHON_PN}-markdown \
+    ${PYTHON_PN}-flask \
+    ${PYTHON_PN}-jinja2 \
+    ${PYTHON_PN}-tornado \
+    ${PYTHON_PN}-regex \
+    ${PYTHON_PN}-flask-login \
+    ${PYTHON_PN}-flask-babel \
+    ${PYTHON_PN}-flask-assets \
+    ${PYTHON_PN}-blinker \
+    ${PYTHON_PN}-werkzeug \ 
+    ${PYTHON_PN}-werkzeug-tests \ 
+    ${PYTHON_PN}-cachelib \
+    ${PYTHON_PN}-pyyaml \
+    ${PYTHON_PN}-markdown \
+    ${PYTHON_PN}-pyserial \
+    ${PYTHON_PN}-netaddr \
+    ${PYTHON_PN}-watchdog \
+    ${PYTHON_PN}-sarge \
+    ${PYTHON_PN}-netifaces \
+    ${PYTHON_PN}-pylru \
+    ${PYTHON_PN}-rsa \
+    ${PYTHON_PN}-pkginfo \
+    ${PYTHON_PN}-requests \
+    ${PYTHON_PN}-semantic-version \
+    ${PYTHON_PN}-psutil \
+    ${PYTHON_PN}-click \
+    ${PYTHON_PN}-awesome-slugify \
+    ${PYTHON_PN}-feedparser \
+    ${PYTHON_PN}-future \
+    ${PYTHON_PN}-websocket-client \
+    ${PYTHON_PN}-wrapt \
+    ${PYTHON_PN}-emoji \
+    ${PYTHON_PN}-frozendict \
+    ${PYTHON_PN}-sentry-sdk \
+    ${PYTHON_PN}-filetype \
+    ${PYTHON_PN}-futures \ 
+    ${PYTHON_PN}-monotonic \
+    ${PYTHON_PN}-scandir \ 
+    ${PYTHON_PN}-chainmap \
+    ${PYTHON_PN}-typing \
+    ${PYTHON_PN}-pip \
+    sudo \
+    "
+
+BBCLASSEXTEND = "native"

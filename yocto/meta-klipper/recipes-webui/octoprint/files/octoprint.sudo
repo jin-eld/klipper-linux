@@ -1,0 +1,4 @@
+octoprint ALL=NOPASSWD: /etc/init.d/octoprint
+octoprint ALL=NOPASSWD: /sbin/shutdown
+octoprint ALL=NOPASSWD: /usr/bin/pip
+octoprint ALL=NOPASSWD: /usr/bin/python

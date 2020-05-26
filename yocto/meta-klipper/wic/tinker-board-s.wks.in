@@ -1,0 +1,25 @@
+# Copyright (C) 2020 Garmin Ltd. or its subsidiaries
+# Released under the MIT license (see COPYING.MIT for the terms)
+#
+# Disk layout
+# Note that the reference documentation refers to 512 byte disk sectors, but
+# wic uses 1KB blocks
+#
+#   Partition   Start Sector    Number of Sectors
+#   loader1     64              8000
+#   reserved1   8064            128
+#   reserved2   8192            8192
+#   loader2     16384           8192
+#   atf         24576           8192
+#   root        32768           -
+
+part loader1    --align 32     --size 4000K            --ondisk ${RK_BOOT_DEVICE} --source rawcopy --sourceparams="file=idbloader.img"
+part reserved1  --align 4032   --size 64K              --ondisk ${RK_BOOT_DEVICE}
+part reserved2  --align 4096   --size 4096K            --ondisk ${RK_BOOT_DEVICE}
+part loader2    --align 8192   --size 4096K            --ondisk ${RK_BOOT_DEVICE} --source rawcopy --sourceparams="file=u-boot.bin"
+part atf        --align 12288  --size 4096K            --ondisk ${RK_BOOT_DEVICE}
+part /          --align 16384  --active --ondisk ${RK_BOOT_DEVICE} --source rawcopy --sourceparams="file=klipper-linux-rootfs-${MACHINE}.ext4" --fstype=ext4 --label root
+
+bootloader --ptable gpt --append="console=tty1 console=ttyS2,115200n8 rw root=/dev/${RK_BOOT_DEVICE}p6 rootfstype=ext4 init=/sbin/init"
+
+

@@ -37,3 +37,10 @@ And build the image:
 `$ bitbake klipper-image-tinker-board-s`
 
 Note, that git submodules are being used, so make sure to properly init them after initial cloning.
+
+## Links
+
+If you have no clue what I am talking about:
+
+https://www.klipper3d.org/ <br/>
+https://www.yoctoproject.org/docs/latest/ref-manual/ref-manual.html

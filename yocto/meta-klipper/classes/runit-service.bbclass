@@ -32,7 +32,7 @@
 RUNIT_SERVICE_PN ?= "${PN}"
 RUNIT_SERVICE_AUTOSTART ?= "1"
  
-RDEPENDS_${PN}_append = "runit busybox"
+RDEPENDS_${PN}_append = "busybox busybox-runit"
 
 runit_service_prerm() {
 if [ "x$D" = "x" ]; then
@@ -40,7 +40,7 @@ if [ "x$D" = "x" ]; then
         if [  -f "/etc/runit/${RUNIT_SERVICE_NAME}/supervise/stat" ]; then
             if [ "`cat /etc/runit/${RUNIT_SERVICE_NAME}/supervise/stat`" = "run" ]; then
                 echo "Stopping ${RUNIT_SERVICE_NAME}..."
-                /usr/sbin/sv force-stop /etc/runit/${RUNIT_SERVICE_NAME} || true
+                sv force-stop /etc/runit/${RUNIT_SERVICE_NAME} || true
             fi # current service status
         fi # suervice existence
     fi # service "down" file
@@ -50,12 +50,13 @@ fi # live image check
 runit_service_postinst() {
 if [ "x$D" = "x" ]; then
     if [ "${RUNIT_SERVICE_AUTOSTART}" -eq "1" ]; then
+
         if [ -d "/etc/runit/${RUNIT_SERVICE_NAME}" ] && [ ! -f "/etc/runit/${RUNIT_SERVICE_NAME}/down" ]; then
             # If the logging service has been reconfigured, it must be restarted
             # as well. Restarting(sv restart) the service alone does not help.
             # The easiest way is to shutdown the runsv which terminates all it's
             # children, then let runsvdir restart it automatically
-            /usr/sbin/sv force-shutdown /etc/runit/${RUNIT_SERVICE_NAME} || true
+            sv force-shutdown /etc/runit/${RUNIT_SERVICE_NAME} || true
         fi # service "down" file
     fi # autostart service?
 fi # live image check

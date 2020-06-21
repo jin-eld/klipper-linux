@@ -1,0 +1,8 @@
+#!/bin/sh
+
+CONFIG=/etc/lighttpd/lighttpd.conf
+mkdir -p /var/log/lighttpd
+mkdir -p /var/run/lighttpd
+
+exec 2>&1
+exec /usr/sbin/lighttpd -D -f $CONFIG

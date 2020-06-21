@@ -31,7 +31,8 @@
 
 RUNIT_SERVICE_PN ?= "${PN}"
 RUNIT_SERVICE_AUTOSTART ?= "1"
- 
+RUNIT_SERVICE_DIR ?= "/var/service"
+
 RDEPENDS_${PN}_append = "busybox busybox-runit"
 
 runit_service_prerm() {
@@ -47,19 +48,14 @@ if [ "x$D" = "x" ]; then
 fi # live image check
 }
 
-runit_service_postinst() {
-if [ "x$D" = "x" ]; then
+runit_service_postinst_ontarget() {
+    # only link when autostart is true, but otherwise do not modify existing
+    # rootfs configuration, i.e. dont force disable
     if [ "${RUNIT_SERVICE_AUTOSTART}" -eq "1" ]; then
-
-        if [ -d "/etc/runit/${RUNIT_SERVICE_NAME}" ] && [ ! -f "/etc/runit/${RUNIT_SERVICE_NAME}/down" ]; then
-            # If the logging service has been reconfigured, it must be restarted
-            # as well. Restarting(sv restart) the service alone does not help.
-            # The easiest way is to shutdown the runsv which terminates all it's
-            # children, then let runsvdir restart it automatically
-            sv force-shutdown /etc/runit/${RUNIT_SERVICE_NAME} || true
-        fi # service "down" file
-    fi # autostart service?
-fi # live image check
+        if [ -d "/etc/runit/${RUNIT_SERVICE_NAME}" ] && [ ! -L "${RUNIT_SERVICE_DIR}/${RUNIT_SERVICE_NAME}" ]; then
+            ln -s "/etc/runit/${RUNIT_SERVICE_NAME}" "${RUNIT_SERVICE_DIR}/${RUNIT_SERVICE_NAME}"
+        fi 
+    fi 
 }
 
 runit_service_postrm() {
@@ -82,7 +78,7 @@ python __anonymous() {
 
 PACKAGESPLITFUNCS_prepend = "populate_packages_runit_service "
 
-populate_packages_runit_service[vardeps] += "runit_service_prerm runit_service_postinst runit_service_postrm"
+populate_packages_runit_service[vardeps] += "runit_service_prerm runit_service_postinst_ontarget runit_service_postrm"
 
 python populate_packages_runit_service() {
     def runit_service(pkg, service):
@@ -90,11 +86,11 @@ python populate_packages_runit_service() {
         localdata.setVar("RUNIT_SERVICE_NAME", service)
         bb.data.update_data(localdata)
 
-        postinst = d.getVar('pkg_postinst_%s' % pkg, True)
+        postinst = d.getVar('pkg_postinst_ontarget_%s' % pkg, True)
         if not postinst:
             postinst = '#!/bin/sh\n'
-        postinst += localdata.getVar('runit_service_postinst', True)
-        d.setVar('pkg_postinst_%s' % pkg, postinst)
+        postinst += localdata.getVar('runit_service_postinst_ontarget', True)
+        d.setVar('pkg_postinst_ontarget_%s' % pkg, postinst)
 
         prerm = d.getVar('pkg_prerm_%s' % pkg, True)
         if not prerm:

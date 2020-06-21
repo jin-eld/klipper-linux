@@ -11,4 +11,18 @@ RDEPENDS_${PN} = "\
     kernel-devicetree \
     klipper \
     octoprint \
+    lighttpd \
+    avahi-daemon \
+    avahi-autoipd \
+    tzdata \
+    tzdata-africa \
+    tzdata-americas \
+    tzdata-antarctica \
+    tzdata-antarctica \
+    tzdata-asia \
+    tzdata-atlantic \
+    tzdata-australia \
+    tzdata-europe \
+    tzdata-pacific \
+    ntp \
     "

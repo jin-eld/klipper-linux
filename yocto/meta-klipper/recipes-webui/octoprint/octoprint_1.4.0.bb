@@ -12,15 +12,12 @@ LIC_FILES_CHKSUM = "file://LICENSE.txt;md5=73f1eb20517c55bf9493b7dd6e480788"
 SRC_URI = "\
     git://github.com/OctoPrint/OctoPrint.git;protocol=https;tag=${PV} \ 
     file://config.yaml \
-    file://octoprint.default \
-    file://octoprint.init \
-    file://octoprint.sudo \
-    file://pip-sudo \
+    file://octoprint.run \        
     "
 
 S = "${WORKDIR}/git"
 
-inherit setuptools update-rc.d useradd
+inherit setuptools runit-service
 
 
 export BUILD_SYS
@@ -30,41 +27,19 @@ export STAGING_LIBDIR
 
 BBCLASSEXTEND = "native"
 
-INITSCRIPT_NAME = "octoprint"
-INITSCRIPT_PARAMS = "start 90 2 3 4 5 . stop 80 2 3 4 5 ."
+RUNIT_SERVICES = "octoprint"
 
 do_install_append(){
     install -d ${D}${sysconfdir}/octoprint
-    install -d ${D}${sysconfdir}/default
-    install -m 0644 ${WORKDIR}/octoprint.default ${D}${sysconfdir}/default/octoprint
     install -m 0644 ${WORKDIR}/config.yaml ${D}${sysconfdir}/octoprint/config.yaml
-    chmod a+rw ${D}${sysconfdir}/octoprint/
-
-    install -d ${D}${sysconfdir}/init.d
-    install -m 0755 ${WORKDIR}/octoprint.init ${D}${sysconfdir}/init.d/octoprint
-
+    install -m 0755 -d ${D}${sysconfdir}/runit/octoprint
+    install -m 0755 ${WORKDIR}/octoprint.run ${D}${sysconfdir}/runit/octoprint/run
     install -d ${D}${localstatedir}/lib/octoprint
-    chmod a+rw ${D}${localstatedir}/lib/octoprint
-
-    install -d ${D}${sysconfdir}/sudoers.d
-    install -m 0644 ${WORKDIR}/octoprint.sudo ${D}${sysconfdir}/sudoers.d/octoprint
-
-    install -d ${D}${bindir}
-    install -m 0755 ${WORKDIR}/pip-sudo ${D}${bindir}
 }
 
 
 FILES_${PN} += "${sysconfdir} ${localstatedir}"
 CONFFILES_${PN} += "${sysconfdir}/octoprint/config.yaml"
-
-USERADD_PACKAGES = "${PN}"
-GROUPADD_PARAM_${PN} = "octoprint"
-USERADD_PARAM_${PN} = "--system -d ${localstatedir}/lib/octoprint/ -g octoprint octoprint"
-
-pkg_postinst_ontarget_${PN}_append () {
-    chown -R octoprint.octoprint $D${sysconfdir}/octoprint
-    chown -R octoprint.octoprint $D${localstatedir}/lib/octoprint
-}
 
 DEPENDS = "${PYTHON_PN} ${PYTHON_PN}-markdown-native"
 
@@ -112,7 +87,6 @@ RDEPENDS_${PN} = "\
     ${PYTHON_PN}-chainmap \
     ${PYTHON_PN}-typing \
     ${PYTHON_PN}-pip \
-    sudo \
     "
 
 BBCLASSEXTEND = "native"

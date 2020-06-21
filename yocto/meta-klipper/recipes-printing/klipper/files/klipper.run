@@ -1,0 +1,30 @@
+#!/bin/sh
+
+DAEMON=/usr/bin/klippy
+LOGDIR=/var/log/klipper
+
+DEFAULTS_FILE=/etc/default/klipper
+
+mkdir -p $LOGDIR
+
+PRINTER_CONFIG_DIR="/etc/klipper"
+mkdir -p $PRINTER_CONFIG_DIR
+
+
+# Read defaults file
+if [ -r $DEFAULTS_FILE ]; then
+    source $DEFAULTS_FILE
+fi
+
+PRINTER_CONFIG="$PRINTER_CONFIG_DIR/printer.cfg"
+
+OPTIONS="$PRINTER_CONFIG -l $LOGDIR/klipper.log"
+
+if [ ! -x $DAEMON ] || [ ! -s $PRINTER_CONFIG ]; then
+    echo "$0: $DAEMON or $PRINTER_CONFIG not found!"
+    sleep 10
+    exit 1
+fi
+
+exec 2>&1
+exec $DAEMON $OPTIONS

@@ -1,0 +1,430 @@
+From a0f142543f907f0f65a19f6d0df217a526ebda57 Mon Sep 17 00:00:00 2001
+From: Sergey 'Jin' Bostandzhyan <jin@mediatomb.cc>
+Date: Sun, 21 Jun 2020 02:38:00 +0200
+Subject: [PATCH] Use setuptools for packaging
+
+This allows to cross compile the C parts of klippy, instead of being
+forced to build it directly on the target.
+---
+ MANIFEST.in                       |  2 ++
+ klippy/__init__.py                |  5 +++++
+ klippy/chelper/__init__.py        | 19 +------------------
+ klippy/extras/bed_screws.py       |  2 +-
+ klippy/extras/bed_tilt.py         |  2 +-
+ klippy/extras/bltouch.py          |  2 +-
+ klippy/extras/bus.py              |  2 +-
+ klippy/extras/delta_calibrate.py  |  2 +-
+ klippy/extras/extruder_stepper.py |  2 +-
+ klippy/extras/force_move.py       |  2 +-
+ klippy/extras/manual_probe.py     |  2 +-
+ klippy/extras/manual_stepper.py   |  2 +-
+ klippy/extras/probe.py            |  2 +-
+ klippy/extras/replicape.py        |  2 +-
+ klippy/extras/sx1509.py           |  2 +-
+ klippy/extras/z_tilt.py           |  2 +-
+ klippy/kinematics/cartesian.py    |  2 +-
+ klippy/kinematics/corexy.py       |  2 +-
+ klippy/kinematics/delta.py        |  2 +-
+ klippy/kinematics/extruder.py     |  2 +-
+ klippy/kinematics/polar.py        |  2 +-
+ klippy/kinematics/rotary_delta.py |  2 +-
+ klippy/kinematics/winch.py        |  2 +-
+ klippy/klippy.py                  |  2 +-
+ klippy/toolhead.py                |  2 +-
+ setup.py                          | 29 +++++++++++++++++++++++++++++
+ 26 files changed, 59 insertions(+), 40 deletions(-)
+ create mode 100644 MANIFEST.in
+ create mode 100644 klippy/__init__.py
+ create mode 100644 setup.py
+
+diff --git a/MANIFEST.in b/MANIFEST.in
+new file mode 100644
+index 00000000..8e306491
+--- /dev/null
++++ b/MANIFEST.in
+@@ -0,0 +1,2 @@
++include klippy/extras/display/menu.cfg
++include klippy/extras/display/display.cfg
+diff --git a/klippy/__init__.py b/klippy/__init__.py
+new file mode 100644
+index 00000000..bd206ac5
+--- /dev/null
++++ b/klippy/__init__.py
+@@ -0,0 +1,5 @@
++# Package definition for the extras directory
++#
++# Copyright (C) 2018  Kevin O'Connor <kevin@koconnor.net>
++#
++# This file may be distributed under the terms of the GNU GPLv3 license.
+diff --git a/klippy/chelper/__init__.py b/klippy/chelper/__init__.py
+index 1a4b2d74..63f1ba07 100644
+--- a/klippy/chelper/__init__.py
++++ b/klippy/chelper/__init__.py
+@@ -162,20 +162,6 @@ def get_mtimes(srcdir, filelist):
+         out.append(t)
+     return out
+ 
+-# Check if the code needs to be compiled
+-def check_build_code(srcdir, target, sources, cmd, other_files=[]):
+-    src_times = get_mtimes(srcdir, sources + other_files)
+-    obj_times = get_mtimes(srcdir, [target])
+-    if not obj_times or max(src_times) > min(obj_times):
+-        logging.info("Building C code module %s", target)
+-        srcfiles = [os.path.join(srcdir, fname) for fname in sources]
+-        destlib = os.path.join(srcdir, target)
+-        res = os.system(cmd % (destlib, ' '.join(srcfiles)))
+-        if res:
+-            msg = "Unable to build C code module (error=%s)" % (res,)
+-            logging.error(msg)
+-            raise Exception(msg)
+-
+ FFI_main = None
+ FFI_lib = None
+ pyhelper_logging_callback = None
+@@ -185,8 +171,6 @@ def get_ffi():
+     global FFI_main, FFI_lib, pyhelper_logging_callback
+     if FFI_lib is None:
+         srcdir = os.path.dirname(os.path.realpath(__file__))
+-        check_build_code(srcdir, DEST_LIB, SOURCE_FILES, COMPILE_CMD
+-                         , OTHER_FILES)
+         FFI_main = cffi.FFI()
+         for d in defs_all:
+             FFI_main.cdef(d)
+@@ -208,12 +192,11 @@ HC_COMPILE_CMD = "gcc -Wall -g -O2 -o %s %s -lusb"
+ HC_SOURCE_FILES = ['hub-ctrl.c']
+ HC_SOURCE_DIR = '../../lib/hub-ctrl'
+ HC_TARGET = "hub-ctrl"
+-HC_CMD = "sudo %s/hub-ctrl -h 0 -P 2 -p %d"
++HC_CMD = "hub-ctrl -h 0 -P 2 -p %d"
+ 
+ def run_hub_ctrl(enable_power):
+     srcdir = os.path.dirname(os.path.realpath(__file__))
+     hubdir = os.path.join(srcdir, HC_SOURCE_DIR)
+-    check_build_code(hubdir, HC_TARGET, HC_SOURCE_FILES, HC_COMPILE_CMD)
+     os.system(HC_CMD % (hubdir, enable_power))
+ 
+ 
+diff --git a/klippy/extras/bed_screws.py b/klippy/extras/bed_screws.py
+index c10a791f..ee5a13ca 100644
+--- a/klippy/extras/bed_screws.py
++++ b/klippy/extras/bed_screws.py
+@@ -3,7 +3,7 @@
+ # Copyright (C) 2019  Kevin O'Connor <kevin@koconnor.net>
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+-import homing
++from klippy import homing
+ 
+ def parse_coord(config, param):
+     pair = config.get(param).strip().split(',', 1)
+diff --git a/klippy/extras/bed_tilt.py b/klippy/extras/bed_tilt.py
+index dd75655a..83b65908 100644
+--- a/klippy/extras/bed_tilt.py
++++ b/klippy/extras/bed_tilt.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import mathutil
++from klippy import mathutil
+ from . import probe
+ 
+ class BedTilt:
+diff --git a/klippy/extras/bltouch.py b/klippy/extras/bltouch.py
+index 50e27e0e..ba0beb7d 100644
+--- a/klippy/extras/bltouch.py
++++ b/klippy/extras/bltouch.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import homing
++from klippy import homing
+ from . import probe
+ 
+ SIGNAL_PERIOD = 0.020
+diff --git a/klippy/extras/bus.py b/klippy/extras/bus.py
+index 7c6ae440..91c84a4e 100644
+--- a/klippy/extras/bus.py
++++ b/klippy/extras/bus.py
+@@ -3,7 +3,7 @@
+ # Copyright (C) 2018,2019  Kevin O'Connor <kevin@koconnor.net>
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+-import mcu
++from klippy import mcu
+ 
+ def resolve_bus_name(mcu, param, bus):
+     # Find enumerations for the given bus
+diff --git a/klippy/extras/delta_calibrate.py b/klippy/extras/delta_calibrate.py
+index c927eb5e..c7f252a2 100644
+--- a/klippy/extras/delta_calibrate.py
++++ b/klippy/extras/delta_calibrate.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import math, logging, collections
+-import mathutil
++from klippy import mathutil
+ from . import probe
+ 
+ # A "stable position" is a 3-tuple containing the number of steps
+diff --git a/klippy/extras/extruder_stepper.py b/klippy/extras/extruder_stepper.py
+index 9678472a..a05fc91b 100644
+--- a/klippy/extras/extruder_stepper.py
++++ b/klippy/extras/extruder_stepper.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import stepper
++from klippy import stepper
+ 
+ class ExtruderStepper:
+     def __init__(self, config):
+diff --git a/klippy/extras/force_move.py b/klippy/extras/force_move.py
+index 647b0b33..b2247833 100644
+--- a/klippy/extras/force_move.py
++++ b/klippy/extras/force_move.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import math, logging
+-import chelper
++from klippy import chelper
+ 
+ BUZZ_DISTANCE = 1.
+ BUZZ_VELOCITY = BUZZ_DISTANCE / .250
+diff --git a/klippy/extras/manual_probe.py b/klippy/extras/manual_probe.py
+index 663f3c8e..f696a0ae 100644
+--- a/klippy/extras/manual_probe.py
++++ b/klippy/extras/manual_probe.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging, bisect
+-import homing
++from klippy import homing
+ 
+ class ManualProbe:
+     def __init__(self, config):
+diff --git a/klippy/extras/manual_stepper.py b/klippy/extras/manual_stepper.py
+index 5807c04c..965dcbf2 100644
+--- a/klippy/extras/manual_stepper.py
++++ b/klippy/extras/manual_stepper.py
+@@ -3,7 +3,7 @@
+ # Copyright (C) 2019  Kevin O'Connor <kevin@koconnor.net>
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+-import stepper, homing, chelper
++from klippy import stepper, homing, chelper
+ from . import force_move
+ 
+ ENDSTOP_SAMPLE_TIME = .000015
+diff --git a/klippy/extras/probe.py b/klippy/extras/probe.py
+index 02d1b5b9..b60f9271 100644
+--- a/klippy/extras/probe.py
++++ b/klippy/extras/probe.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import pins, homing
++from klippy import pins, homing
+ from . import manual_probe
+ 
+ HINT_TIMEOUT = """
+diff --git a/klippy/extras/replicape.py b/klippy/extras/replicape.py
+index 9236264f..26d37069 100644
+--- a/klippy/extras/replicape.py
++++ b/klippy/extras/replicape.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging, os
+-import pins, mcu
++from klippy import pins, mcu
+ from . import bus
+ 
+ REPLICAPE_MAX_CURRENT = 3.84
+diff --git a/klippy/extras/sx1509.py b/klippy/extras/sx1509.py
+index 7a4f24db..475857d9 100644
+--- a/klippy/extras/sx1509.py
++++ b/klippy/extras/sx1509.py
+@@ -3,7 +3,7 @@
+ # Copyright (C) 2018  Florian Heilmann <Florian.Heilmann@gmx.net>
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+-import pins
++from klippy import pins
+ from . import bus
+ 
+ # Word registers
+diff --git a/klippy/extras/z_tilt.py b/klippy/extras/z_tilt.py
+index 577b7e70..8a49df47 100644
+--- a/klippy/extras/z_tilt.py
++++ b/klippy/extras/z_tilt.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import mathutil
++from klippy import mathutil
+ from . import probe
+ 
+ class ZAdjustHelper:
+diff --git a/klippy/kinematics/cartesian.py b/klippy/kinematics/cartesian.py
+index df57edce..b400bd1d 100644
+--- a/klippy/kinematics/cartesian.py
++++ b/klippy/kinematics/cartesian.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging
+-import stepper, homing
++from klippy import stepper, homing
+ 
+ class CartKinematics:
+     def __init__(self, toolhead, config):
+diff --git a/klippy/kinematics/corexy.py b/klippy/kinematics/corexy.py
+index f04b3009..2da29c97 100644
+--- a/klippy/kinematics/corexy.py
++++ b/klippy/kinematics/corexy.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging, math
+-import stepper, homing
++from klippy import stepper, homing
+ 
+ class CoreXYKinematics:
+     def __init__(self, toolhead, config):
+diff --git a/klippy/kinematics/delta.py b/klippy/kinematics/delta.py
+index 885ce940..1c334547 100644
+--- a/klippy/kinematics/delta.py
++++ b/klippy/kinematics/delta.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import math, logging
+-import stepper, homing, mathutil
++from klippy import stepper, homing, mathutil
+ 
+ # Slow moves once the ratio of tower to XY movement exceeds SLOW_RATIO
+ SLOW_RATIO = 3.
+diff --git a/klippy/kinematics/extruder.py b/klippy/kinematics/extruder.py
+index 3a03b606..e36c02f1 100644
+--- a/klippy/kinematics/extruder.py
++++ b/klippy/kinematics/extruder.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import math, logging
+-import stepper, homing, chelper
++from klippy import stepper, homing, chelper
+ 
+ class PrinterExtruder:
+     def __init__(self, config, extruder_num):
+diff --git a/klippy/kinematics/polar.py b/klippy/kinematics/polar.py
+index e3ee3241..f2643552 100644
+--- a/klippy/kinematics/polar.py
++++ b/klippy/kinematics/polar.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import logging, math
+-import stepper, homing
++from klippy import stepper, homing
+ 
+ class PolarKinematics:
+     def __init__(self, toolhead, config):
+diff --git a/klippy/kinematics/rotary_delta.py b/klippy/kinematics/rotary_delta.py
+index 415a2e7f..ff62ba49 100644
+--- a/klippy/kinematics/rotary_delta.py
++++ b/klippy/kinematics/rotary_delta.py
+@@ -4,7 +4,7 @@
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+ import math, logging
+-import stepper, homing, mathutil, chelper
++from klippy import stepper, homing, mathutil, chelper
+ 
+ class RotaryDeltaKinematics:
+     def __init__(self, toolhead, config):
+diff --git a/klippy/kinematics/winch.py b/klippy/kinematics/winch.py
+index 04e2d498..4de65d58 100644
+--- a/klippy/kinematics/winch.py
++++ b/klippy/kinematics/winch.py
+@@ -3,7 +3,7 @@
+ # Copyright (C) 2018-2019  Kevin O'Connor <kevin@koconnor.net>
+ #
+ # This file may be distributed under the terms of the GNU GPLv3 license.
+-import stepper, mathutil
++from klippy import stepper, mathutil
+ 
+ class WinchKinematics:
+     def __init__(self, toolhead, config):
+diff --git a/klippy/klippy.py b/klippy/klippy.py
+index 84450aea..091dbc3c 100644
+--- a/klippy/klippy.py
++++ b/klippy/klippy.py
+@@ -106,7 +106,7 @@ class Printer:
+             if default is not configfile.sentinel:
+                 return default
+             raise self.config_error("Unable to load module '%s'" % (section,))
+-        mod = importlib.import_module('extras.' + module_name)
++        mod = importlib.import_module('klippy.extras.' + module_name)
+         init_func = 'load_config'
+         if len(module_parts) > 1:
+             init_func = 'load_config_prefix'
+diff --git a/klippy/toolhead.py b/klippy/toolhead.py
+index 617186f6..d3e680d3 100644
+--- a/klippy/toolhead.py
++++ b/klippy/toolhead.py
+@@ -250,7 +250,7 @@ class ToolHead:
+         self.extruder = kinematics.extruder.DummyExtruder()
+         kin_name = config.get('kinematics')
+         try:
+-            mod = importlib.import_module('kinematics.' + kin_name)
++            mod = importlib.import_module('klippy.kinematics.' + kin_name)
+             self.kin = mod.load_kinematics(self, config)
+         except config.error as e:
+             raise
+diff --git a/setup.py b/setup.py
+new file mode 100644
+index 00000000..8d407ace
+--- /dev/null
++++ b/setup.py
+@@ -0,0 +1,29 @@
++from setuptools import setup, find_packages, Extension
++
++c_helper = Extension('klippy/chelper/c_helper',
++                    define_macros = [('MAJOR_VERSION', '1'),
++                                     ('MINOR_VERSION', '0')],
++                    sources = [ 'klippy/chelper/itersolve.c',
++                                'klippy/chelper/kin_cartesian.c',
++                                'klippy/chelper/kin_corexy.c',
++                                'klippy/chelper/kin_delta.c',
++                                'klippy/chelper/kin_extruder.c',
++                                'klippy/chelper/kin_polar.c',
++                                'klippy/chelper/kin_rotary_delta.c',
++                                'klippy/chelper/kin_winch.c',
++                                'klippy/chelper/pyhelper.c',
++                                'klippy/chelper/serialqueue.c',
++                                'klippy/chelper/stepcompress.c',
++                                'klippy/chelper/trapq.c' ])
++
++setup(
++    name = 'klipper',
++    version = '0.8.0+git',
++    description = 'Klipper 3D Printing Firmware',
++    packages=find_packages(),
++    include_package_data = True,
++    entry_points = { "console_scripts": [ "klippy = klippy.klippy:main" ] },
++    url = "https://www.klipper3d.org/",
++    ext_modules = [ c_helper ]
++)
++
+-- 
+2.25.4
+

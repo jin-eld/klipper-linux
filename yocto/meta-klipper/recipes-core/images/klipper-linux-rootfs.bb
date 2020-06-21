@@ -12,8 +12,7 @@ IMAGE_ROOTFS_EXTRA_SPACE = "204800"
 
 inherit extrausers
 EXTRA_USERS_PARAMS = "\
-    useradd -p \$6\$75uXvknClpLLmi\$SaSiPB9qALjsPn3W43Kn7rtAcW9Gz/fqKJYzAiGBestRPR8t8NyBUvC8OO49T61usTCQZgkDqBfh3GGApWuLP0 printer ; \
-    usermod -a -G klipper,octoprint printer ; \
+    useradd -p \$6\$75uXvknClpLLmi\$SaSiPB9qALjsPn3W43Kn7rtAcW9Gz/fqKJYzAiGBestRPR8t8NyBUvC8OO49T61usTCQZgkDqBfh3GGApWuLP0 klipper ; \
     "
 
 create_extlinux_config() {

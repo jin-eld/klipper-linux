@@ -11,7 +11,6 @@ inherit allarch
 RDEPENDS_${PN} = "openssl openssl-misc openssl-bin busybox cronie"
 
 SRC_URI = "file://create-cert \
-           file://create-certificate.confbackup \
            file://create-certificate.cron \
 "
 

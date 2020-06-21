@@ -1,0 +1,7 @@
+#!/bin/sh
+
+REL=/etc/ssl/certs/
+
+cd $REL
+mkdir -p $STAGING/$REL
+cp dsscert.pem dssprivkey.pem dsscertreq.csr $STAGING/$REL

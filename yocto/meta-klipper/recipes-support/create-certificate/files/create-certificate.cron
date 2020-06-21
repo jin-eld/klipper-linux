@@ -1,0 +1,12 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+#+---------------- minute (0 - 59)
+#|  +------------- hour (0 - 23)
+#|  |  +---------- day of month (1 - 31)
+#|  |  |  +------- month (1 - 12)
+#|  |  |  |  +---- day of week (0 - 6) (Sunday=0 or 7)
+#|  |  |  |  |
+#*  *  *  *  *  user command to be executed
+0   0  1  *  *  root /usr/bin/create-cert >/dev/null 2>&1
+

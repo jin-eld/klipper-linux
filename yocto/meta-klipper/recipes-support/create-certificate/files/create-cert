@@ -1,0 +1,197 @@
+#!/bin/sh
+
+CERTPATH="/etc/ssl/certs/"
+
+while [ -n "$1" ]; do
+   CMD="${1%=*}"
+   ARG="${1#*=}"
+   if [ "$CMD" == "refresh" ]; then
+      rm -f "$CERTPATH/localcert.pem" "$CERTPATH/localcertreq.csr"
+   elif [ "$CMD" == "path" ]; then
+      CERTPATH=$ARG
+   fi
+   shift
+done
+mkdir -p "$CERTPATH"
+
+# keep compatibility
+if [ -s "$CERTPATH/privkey.pem" ]; then
+   mv -f "$CERTPATH/privkey.pem" "$CERTPATH/localprivkey.pem"
+fi
+if [ -s "$CERTPATH/certreq.csr" ]; then
+   mv -f "$CERTPATH/certreq.csr" "$CERTPATH/localcertreq.csr"
+fi
+
+TMPFILE=`mktemp`
+DATE_MODIFIED=0
+
+# Input: Jan  1 00:00:03 1995 GMT
+# busybox date is too limited to parse that
+ssl_date_to_epoch()
+{
+    MONTHS="Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec"
+    MONTH=$(echo "$1" | awk '{ print $1 }')
+    STR="${MONTHS%$MONTH*}"
+    MONTH_NUM=$(echo "$((${#string}/4 + 1))")
+
+    MONTH_DAY=$(echo "$1" | awk '{ print $2 }')
+    TIME=$(echo "$1" | awk '{ print $3 }')
+    YEAR=$(echo "$1" | awk '{ print $4 }')
+    echo `date -d "$YEAR-$MONTH_NUM-$MONTH_DAY $TIME" +%s`
+}
+
+which openssl >/dev/null
+if [ "$?" -ne "0" ]; then
+    echo "Please install openssl and make sure it is in your PATH!"
+    exit 1
+fi
+
+if [ -n "$CERTPATH" ] && [ ! -d "$CERTPATH" ]; then
+    echo "Output directory does not exist, creating $CERTPATH"
+    mkdir -p "$1"
+fi
+
+date2epoch () {
+    if [ -n "$1" ]; then
+       date --utc --date "$1" '+%s'
+    else
+       date --utc '+%s'
+    fi
+}
+
+# if systemtime is *before* year 2015 then go forward in time
+# to year 2015 and create a certificate that is valid until 2037
+sanitize_start_date()
+{
+    if [ $DATE_MODIFIED -eq 1 ]; then
+       return;
+    fi
+
+    TNOW=$(date2epoch)
+    TMIN=$(date2epoch "2015-01-01 00:00:00")
+    if [ $TNOW -le $TMIN ]; then
+       DATE_MODIFIED=1
+       date -u -s "2015-01-01 00:00:00"
+    fi
+}
+
+cleanup ()
+{
+    if [ $DATE_MODIFIED -eq 1 ]; then
+        date -s "`cat $TMPFILE`"
+    fi
+    rm -f $TMPFILE
+}
+
+trap cleanup EXIT
+
+date +"%Y-%m-%d %T" > $TMPFILE
+sanitize_start_date
+
+EPOCH_CURRENT_DATE=$(date2epoch)
+TMAX=$(date2epoch "2037-01-01 00:00:00")
+DAYS_VALID=$(expr $(expr $TMAX - $EPOCH_CURRENT_DATE) / 86400)
+
+if [ -f /etc/init.d/rng-tools ]; then
+    # ensure that we will have enough entropy to generate rsa key
+    /etc/init.d/rng-tools start
+fi
+
+if [ ! -s "$CERTPATH/localprivkey.pem" ]; then
+    openssl genrsa -out $CERTPATH/localprivkey.pem 2048
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to generate private key!"
+        exit 1
+    fi
+    chmod 400 $CERTPATH/localprivkey.pem
+else
+    echo "Reusing existing localprivkey.pem file as private key."
+fi
+
+create_request ()
+{
+cat > "$CERTPATH/localreq.conf" <<-EOD
+[req]
+default_bits       = 4096 # key length 4096 bits RSA
+distinguished_name = req_distinguished_name
+req_extensions     = SAN
+default_md         = sha256
+dirstring_type     = nombstr
+prompt = no
+
+[req_distinguished_name]
+C  = XX
+ST = YY
+L  = Klipper 
+O  = Klipper
+OU = Klipper
+CN = $1
+
+[SAN]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = $1.local
+EOD
+if [ -e /sys/class/net/eth0 ]; then
+    IP=`ifconfig eth0 | sed -n '/inet addr/s/.*addr.\([^ ]*\) .*/\1/p'`
+    if [ -n "$IP" ]; then
+       echo "IP.1 = $IP" >> "$CERTPATH/localreq.conf"
+    fi
+fi
+if [ -e /sys/class/net/eth1 ]; then
+    IP=`ifconfig eth1 | sed -n '/inet addr/s/.*addr.\([^ ]*\) .*/\1/p'`
+    if [ -n "$IP" ]; then
+       echo "IP.2 = $IP" >> "$CERTPATH/localreq.conf"
+    fi
+fi
+}
+
+create_request $(hostname)
+
+if [ ! -s "$CERTPATH/localcertreq.csr" ]; then
+    openssl req -new -sha256 -nodes -newkey rsa:2048 -batch -days $DAYS_VALID -config $CERTPATH/localreq.conf -key $CERTPATH/localprivkey.pem -out $CERTPATH/localcertreq.csr -reqexts SAN -extensions SAN
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to create a certificate signing request!"
+        exit 1
+    fi
+else
+    echo "Reusing existing localcertreq.csr file as certificate signing request."
+fi
+
+if [ -s $CERTPATH/localcert.pem ]; then
+    EPOCH_CERT_DATE=0
+    CURRENT_CERT_DATE=$(openssl x509 -noout -in $CERTPATH/localcert.pem -enddate | cut -d '=' -f 2)
+
+    if [ -n "$CURRENT_CERT_DATE" ]; then
+        EPOCH_CERT_DATE=$(ssl_date_to_epoch "$CURRENT_CERT_DATE")
+    fi
+
+    # recreate certificate 2 months prior to current date
+    # 5184000 seconds = roughly two months
+    EPOCH_CURRENT_DATE=$(expr $EPOCH_CURRENT_DATE - 5184000)
+
+    if [ $EPOCH_CERT_DATE -lt $EPOCH_CURRENT_DATE ]; then
+        rm -f $CERTPATH/localcert.pem
+        echo "Certificate will expire on $CURRENT_CERT_DATE, removing."
+    fi
+fi
+
+if [ ! -s "$CERTPATH/localcert.pem" ]; then
+    openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days $DAYS_VALID -config $CERTPATH/localreq.conf -in $CERTPATH/localcertreq.csr -key $CERTPATH/localprivkey.pem -out $CERTPATH/localcert.pem -extensions SAN
+    if [ "$?" -ne "0" ]; then
+        echo "Could not create self signed certificate!"
+        exit 1
+    fi
+
+    cat $CERTPATH/localprivkey.pem >> $CERTPATH/localcert.pem
+    if [ "$?" -ne "0" ]; then
+        echo "Failed to add localprivkey.pem to localcert.pem"
+        exit 1
+    fi
+
+    echo "Certificate created as \"localcert.pem\""
+fi
+
+exit 0
+

@@ -92,10 +92,3 @@ python populate_packages_prepend () {
     lighttpd_libdir = d.expand('${libdir}')
     do_split_packages(d, lighttpd_libdir, r'^mod_(.*)\.so$', 'lighttpd-module-%s', 'Lighttpd module for %s', extra_depends='')
 }
-
-pkg_postinst_ontarget_${PN}() {
-    #!/bin/sh
-    if [ ! -s /etc/lighttpd/dhparam.pem ]; then
-        openssl dhparam -out /etc/lighttpd/dhparam.pem 4096
-    fi
-}

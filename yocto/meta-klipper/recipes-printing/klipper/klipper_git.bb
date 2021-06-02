@@ -10,13 +10,14 @@ DEPENDS += "libusb"
 
 SRC_URI = "\
     git://github.com/KevinOConnor/klipper.git;protocol=https \
-    file://0001-Use-setuptools-for-packaging.patch \
+    file://0001-Allow-to-package-klippy-using-setuptools.patch \
     file://klipper.default \
     file://klipper.run \
     "
 
-SRCREV = "${AUTOREV}"
-PV = "0.8.0+gitr${SRCPV}"
+#SRCREV = "${AUTOREV}"
+SRCREV = "c148f17ea3391e3720961270a12eb0645f688e12"
+PV = "0.9.1+gitr${SRCPV}"
 
 S = "${WORKDIR}/git"
 

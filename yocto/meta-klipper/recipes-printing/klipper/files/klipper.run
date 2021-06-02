@@ -18,7 +18,7 @@ fi
 
 PRINTER_CONFIG="$PRINTER_CONFIG_DIR/printer.cfg"
 
-OPTIONS="$PRINTER_CONFIG -l $LOGDIR/klipper.log"
+OPTIONS="$PRINTER_CONFIG -l $LOGDIR/klipper.log -a /tmp/klippy_uds"
 
 if [ ! -x $DAEMON ] || [ ! -s $PRINTER_CONFIG ]; then
     echo "$0: $DAEMON or $PRINTER_CONFIG not found!"

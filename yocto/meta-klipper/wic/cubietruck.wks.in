@@ -1,0 +1,14 @@
+# The disk layout used is:
+#
+#    0                      -> 8*1024                           - reserverd
+#    8*1024                 ->                                  - arm combined spl/u-boot or aarch64 spl
+#    40*1024                ->                                  - aarch64 u-boot
+#    2048*1024              -> BOOT_SPACE                       - bootloader and kernel
+
+part spl --offset 8k --source=rawcopy --sourceparams="file=u-boot-sunxi-with-spl.bin" --no-table
+part uboot --offset 2048k --active --source bootimg-partition --fstype=vfat --label BOOT --sourceparams="loader=u-boot"
+part root --size 256M --align 2048 --source rawcopy --sourceparams="file=klipper-linux-rootfs-${MACHINE}.ext4" --fstype=ext4 --label ROOT
+
+bootloader --ptable msdos --append="console=ttyS0,115200n8 rw rootfstype=ext4 init=/sbin/init root=/dev/mmcblk0p2"
+
+

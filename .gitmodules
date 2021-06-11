@@ -13,3 +13,9 @@
 [submodule "yocto/openembedded-core"]
 	path = yocto/openembedded-core
 	url = git://git.openembedded.org/openembedded-core
+[submodule "yocto/meta-sunxi"]
+	path = yocto/meta-sunxi
+	url = https://github.com/linux-sunxi/meta-sunxi
+[submodule "yocto/meta-arm"]
+	path = yocto/meta-arm
+	url = git://git.yoctoproject.org/meta-arm
